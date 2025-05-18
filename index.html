@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en" class=""> <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tracker with Collapsible Forms, Files & Themes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* bg-gray-100 */
+            color: #1f2937; /* text-gray-800 */
+            overflow-x: auto;
+            min-height: 100vh;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        /* Dark mode styles */
+        .dark body {
+            background-color: #1f2937; /* bg-gray-800 */
+            color: #f3f4f6; /* text-gray-100 */
+        }
+        .dark .kanban-column {
+            background-color: #374151; /* bg-gray-700 */
+            border-color: #4b5563; /* border-gray-600 */
+        }
+        .dark .task {
+            background-color: #4b5563; /* bg-gray-600 */
+            border-color: #52525b; /* border-zinc-600 */
+            color: #e5e7eb; /* text-gray-200 */
+        }
+        .dark .task .task-title { color: #f3f4f6; }
+        .dark .task .task-description { color: #d1d5db; }
+        .dark .task .task-file-info { color: #cbd5e1; }
+        .dark .add-item-container, .dark .modal-content {
+            background-color: #374151; /* bg-gray-700 */
+            color: #f3f4f6; /* text-gray-100 */
+        }
+        .dark .add-item-container-header .minimize-toggle-btn {
+            color: #9ca3af; /* gray-400 */
+        }
+        .dark .add-item-container-header .minimize-toggle-btn:hover {
+            background-color: #4b5563; /* gray-600 */
+            color: #e5e7eb; /* gray-200 */
+        }
+        .dark .modal-content { border-color: #4b5563; }
+        .dark input, .dark select, .dark textarea {
+            background-color: #4b5563; /* bg-gray-600 */
+            border-color: #52525b; /* border-zinc-500 */
+            color: #e5e7eb; /* text-gray-200 */
+        }
+        .dark input::placeholder, .dark textarea::placeholder { color: #9ca3af; }
+        .dark input[type="file"]::file-selector-button {
+            background-color: #6b7280; color: #e5e7eb; border-color: #4b5563;
+        }
+        .dark input[type="file"]::file-selector-button:hover { background-color: #4b5563; }
+        .dark .close-button { color: #9ca3af; }
+        .dark .close-button:hover { color: #e5e7eb; }
+        .dark .delete-column-btn { color: #f87171; }
+        .dark .delete-column-btn:hover { color: #ef4444; }
+
+        .kanban-board-container {
+            display: flex; gap: 1.5rem; padding: 1rem;
+            align-items: flex-start; min-height: calc(100vh - 150px); /* Adjusted for potentially smaller add item forms */
+        }
+        .kanban-column {
+            flex: 0 0 320px; width: 320px; max-width: 320px; min-height: 400px;
+            background-color: white; padding: 0;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+            transition: background-color 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+            cursor: grab; display: flex; flex-direction: column;
+        }
+        .kanban-column:active {
+            cursor: grabbing;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.2), 0 4px 6px -2px rgba(0,0,0,0.1);
+        }
+        .kanban-column.column-drag-over { outline: 2px dashed #4f46e5; outline-offset: 4px; }
+        .column-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 0; border-bottom-width: 2px;
+            transition: border-color 0.3s ease, background-color 0.3s ease;
+            padding: 0.75rem 1.25rem; border-radius: 0.5rem 0.5rem 0 0;
+        }
+        .column-title {
+            font-size: 1.25rem; font-weight: 600;
+            transition: color 0.3s ease; word-break: break-all;
+        }
+        .delete-column-btn {
+            background: none; border: none; cursor: pointer;
+            font-size: 1.2rem; padding: 0.25rem;
+        }
+        .tasks-container {
+            min-height: 200px; padding: 1.25rem;
+            overflow-y: auto; flex-grow: 1;
+        }
+        .tasks-container.drag-over { background-color: #c7d2fe; }
+        .dark .tasks-container.drag-over { background-color: #4338ca; }
+
+        .task {
+            cursor: grab;
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+            word-break: break-word;
+            background-color: #f9fafb; border: 1px solid #e5e7eb;
+            color: #1f2937; padding: 0.75rem;
+            border-radius: 0.375rem;
+            box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
+            margin-bottom: 0.75rem;
+        }
+        .task-title { font-weight: 600; color: #111827; margin-bottom: 0.25rem; }
+        .task-description {
+            font-size: 0.875rem; color: #4b5563;
+            white-space: pre-wrap; margin-bottom: 0.5rem;
+        }
+        .task-image {
+            width: 100%; max-height: 200px;
+            object-fit: cover; border-radius: 0.25rem; margin-top: 0.5rem;
+        }
+        .task-file-info {
+            font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem; padding: 0.5rem;
+            background-color: #e5e7eb; border-radius: 0.25rem;
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+        .dark .task-file-info { background-color: #374151; }
+        .task-file-info svg { width: 1rem; height: 1rem; fill: currentColor; }
+        .task:active { cursor: grabbing; transform: scale(1.03); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .task.dragging { opacity: 0.5; }
+
+        #confetti-canvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 9999;
+        }
+        .add-item-container { /* This is the main container for Add Task/List sections */
+            background-color: white; padding: 1.5rem; border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        .add-item-container-header { /* New: For title and toggle button */
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem; /* mb-4 */
+        }
+        .minimize-toggle-btn {
+            padding: 0.25rem; /* p-1 */
+            border-radius: 0.25rem; /* rounded */
+            color: #6b7280; /* text-gray-500 */
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .minimize-toggle-btn:hover {
+            background-color: #e5e7eb; /* hover:bg-gray-200 */
+            color: #1f2937; /* hover:text-gray-800 */
+        }
+        .collapsible-content { /* Content that will be shown/hidden */
+            /* transition: max-height 0.3s ease-out, opacity 0.3s ease-out; */ /* Can add smooth transitions later */
+            overflow: hidden;
+        }
+        .collapsible-content.minimized {
+            display: none;
+            /* max-height: 0;
+            opacity: 0; */
+        }
+
+        .modal {
+            display: none; position: fixed; z-index: 1000; left: 0; top: 0;
+            width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: #fefefe; margin: 5% auto; padding: 20px;
+            border: 1px solid #e5e7eb; width: 90%; max-width: 600px;
+            border-radius: 0.5rem;
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+        .close-button {
+            color: #9ca3af; float: right; font-size: 28px; font-weight: bold;
+        }
+        .close-button:hover, .close-button:focus {
+            color: #1f2937; text-decoration: none; cursor: pointer;
+        }
+        input, select, textarea {
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+        input[type="file"]::file-selector-button {
+            margin-right: 0.5rem; padding: 0.5rem 0.75rem; border: 1px solid #d1d5db;
+            border-radius: 0.375rem; background-color: #e5e7eb; color: #374151;
+            font-weight: 500; cursor: pointer; transition: background-color 0.2s ease;
+        }
+        input[type="file"]::file-selector-button:hover { background-color: #d1d5db; }
+
+        .theme-toggle-button {
+            padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 500;
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+        .theme-toggle-button.light { background-color: #4f46e5; color: white; }
+        .theme-toggle-button.light:hover { background-color: #4338ca; }
+        .theme-toggle-button.dark { background-color: #f59e0b; color: #1f2937; }
+        .theme-toggle-button.dark:hover { background-color: #d97706; }
+    </style>
+</head>
+<body>
+    <canvas id="confetti-canvas"></canvas>
+
+    <div class="container mx-auto px-4 py-6">
+        <header class="text-center mb-6 flex justify-between items-center">
+            <h1 class="text-3xl md:text-4xl font-bold text-indigo-600 dark:text-indigo-400">Tracker</h1>
+            <button id="theme-toggle-btn" class="theme-toggle-button light">Toggle Theme</button>
+        </header>
+
+        <div class="mb-8 max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="add-item-container">
+                <div class="add-item-container-header">
+                    <h2 class="text-2xl font-semibold">Add New Task</h2>
+                    <button class="minimize-toggle-btn" data-target="add-task-content-area" aria-label="Toggle Add Task Form">
+                        </button>
+                </div>
+                <div id="add-task-content-area" class="collapsible-content">
+                    <label for="new-task-title-input" class="block mb-1 text-sm font-medium">Title <span class="text-red-500">*</span></label>
+                    <input type="text" id="new-task-title-input" placeholder="Enter task title" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none mb-3" />
+                    
+                    <label for="new-task-description-input" class="block mb-1 text-sm font-medium">Description</label>
+                    <textarea id="new-task-description-input" placeholder="Enter task description (optional)" rows="2" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none mb-3"></textarea>
+
+                    <label for="new-task-image-url-input" class="block mb-1 text-sm font-medium">Image URL</label>
+                    <input type="url" id="new-task-image-url-input" placeholder="https://example.com/image.png (optional)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none mb-3" />
+
+                    <label for="new-task-file-input" class="block mb-1 text-sm font-medium">Attach File (Info Only)</label>
+                    <input type="file" id="new-task-file-input" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-3 file:rounded-md file:border file:border-gray-300 file:text-sm file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 dark:file:bg-gray-700 dark:file:text-gray-200 dark:file:border-gray-600 dark:hover:file:bg-gray-600 mb-3" />
+
+                    <label for="task-column-select" class="block mb-1 text-sm font-medium">Add to column:</label>
+                    <select id="task-column-select" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none mb-3">
+                    </select>
+                    <button id="add-task-button" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-150 ease-in-out">
+                        Add Task
+                    </button>
+                </div>
+            </div>
+
+            <div class="add-item-container">
+                 <div class="add-item-container-header">
+                    <h2 class="text-2xl font-semibold">Add New List</h2>
+                    <button class="minimize-toggle-btn" data-target="add-list-content-area" aria-label="Toggle Add List Form">
+                        </button>
+                </div>
+                <div id="add-list-content-area" class="collapsible-content">
+                    <label for="new-column-input" class="block mb-1 text-sm font-medium">List Title <span class="text-red-500">*</span></label>
+                    <input type="text" id="new-column-input" placeholder="Enter new list title" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none mb-3" />
+                    <label for="column-color-select" class="block mb-1 text-sm font-medium">List color theme:</label>
+                    <select id="column-color-select" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none mb-3">
+                    </select>
+                    <button id="add-column-button" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-150 ease-in-out">
+                        Add List
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="kanban-columns-container" class="kanban-board-container pb-8">
+            </div>
+    </div>
+
+    <div id="editTaskModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="closeModalButton">&times;</span>
+            <h3 class="text-xl font-semibold mb-4">Edit Task</h3>
+            <input type="hidden" id="editTaskId">
+            
+            <label for="edit-task-title-input" class="block mb-1 text-sm font-medium">Title <span class="text-red-500">*</span></label>
+            <input type="text" id="edit-task-title-input" class="w-full p-2 border border-gray-300 rounded-md mb-3">
+            
+            <label for="edit-task-description-input" class="block mb-1 text-sm font-medium">Description</label>
+            <textarea id="edit-task-description-input" rows="3" class="w-full p-2 border border-gray-300 rounded-md mb-3"></textarea>
+
+            <label for="edit-task-image-url-input" class="block mb-1 text-sm font-medium">Image URL</label>
+            <input type="url" id="edit-task-image-url-input" class="w-full p-2 border border-gray-300 rounded-md mb-3" placeholder="https://example.com/image.png (optional)">
+            
+            <label for="edit-task-file-input" class="block mb-1 text-sm font-medium">Attach File (Info Only)</label>
+            <div class="mb-3">
+                <input type="file" id="edit-task-file-input" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-3 file:rounded-md file:border file:border-gray-300 file:text-sm file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 dark:file:bg-gray-700 dark:file:text-gray-200 dark:file:border-gray-600 dark:hover:file:bg-gray-600" />
+                <span id="current-file-info" class="text-xs text-gray-500 dark:text-gray-400 mt-1 block"></span>
+            </div>
+
+            <label for="edit-task-column-select" class="block mb-1 text-sm font-medium">Move to column:</label>
+            <select id="edit-task-column-select" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none mb-4">
+            </select>
+            <div class="flex justify-between items-center">
+                <button id="deleteTaskButton" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-150">
+                    Delete Task
+                </button>
+                <button id="saveTaskButton" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-150">
+                    Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const themeToggleButton = document.getElementById('theme-toggle-btn');
+        const newTaskTitleInput = document.getElementById('new-task-title-input');
+        const newTaskDescriptionInput = document.getElementById('new-task-description-input');
+        const newTaskImageUrlInput = document.getElementById('new-task-image-url-input');
+        const newTaskFileInput = document.getElementById('new-task-file-input');
+        const taskColumnSelect = document.getElementById('task-column-select');
+        const addTaskButton = document.getElementById('add-task-button');
+        const newColumnInput = document.getElementById('new-column-input');
+        const columnColorSelect = document.getElementById('column-color-select');
+        const addColumnButton = document.getElementById('add-column-button');
+        const kanbanColumnsContainer = document.getElementById('kanban-columns-container');
+        const editModal = document.getElementById('editTaskModal');
+        const closeModalButton = document.getElementById('closeModalButton');
+        const editTaskIdInput = document.getElementById('editTaskId');
+        const editTaskTitleInput = document.getElementById('edit-task-title-input');
+        const editTaskDescriptionInput = document.getElementById('edit-task-description-input');
+        const editTaskImageUrlInput = document.getElementById('edit-task-image-url-input');
+        const editTaskFileInput = document.getElementById('edit-task-file-input');
+        const currentFileInfoSpan = document.getElementById('current-file-info');
+        const editTaskColumnSelect = document.getElementById('edit-task-column-select');
+        const saveTaskButton = document.getElementById('saveTaskButton');
+        const deleteTaskButton = document.getElementById('deleteTaskButton');
+        const minimizeToggleButtons = document.querySelectorAll('.minimize-toggle-btn'); // New
+
+        // --- State Management ---
+        let tasks = [];
+        let columnsData = [];
+        let uiSettings = { // New structure for UI preferences
+            theme: 'light',
+            addTaskFormMinimized: false,
+            addListFormMinimized: false
+        };
+        let draggedTaskId = null;
+        let draggedColumnId = null;
+
+        // SVG Icons for Minimize/Expand buttons
+        const SVG_ICON_MINUS = `
+            <svg class="w-5 h-5 pointer-events-none" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                <path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"></path>
+            </svg>`;
+        const SVG_ICON_PLUS = `
+            <svg class="w-5 h-5 pointer-events-none" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"></path>
+            </svg>`;
+
+
+        // --- Column Color Themes ---
+        const COLUMN_THEMES = {
+            gray: { name: 'Gray', border: 'border-gray-400 dark:border-gray-500', bg: 'bg-gray-200 dark:bg-gray-600', text: 'text-gray-700 dark:text-gray-100' },
+            red: { name: 'Red', border: 'border-red-500 dark:border-red-400', bg: 'bg-red-100 dark:bg-red-700/60', text: 'text-red-700 dark:text-red-100' },
+            yellow: { name: 'Yellow', border: 'border-yellow-500 dark:border-yellow-400', bg: 'bg-yellow-100 dark:bg-yellow-700/60', text: 'text-yellow-700 dark:text-yellow-100' },
+            green: { name: 'Green', border: 'border-green-500 dark:border-green-400', bg: 'bg-green-100 dark:bg-green-700/60', text: 'text-green-700 dark:text-green-100' },
+            blue: { name: 'Blue', border: 'border-blue-500 dark:border-blue-400', bg: 'bg-blue-100 dark:bg-blue-700/60', text: 'text-blue-700 dark:text-blue-100' },
+            indigo: { name: 'Indigo', border: 'border-indigo-500 dark:border-indigo-400', bg: 'bg-indigo-100 dark:bg-indigo-700/60', text: 'text-indigo-700 dark:text-indigo-100' },
+            purple: { name: 'Purple', border: 'border-purple-500 dark:border-purple-400', bg: 'bg-purple-100 dark:bg-purple-700/60', text: 'text-purple-700 dark:text-purple-100' },
+            pink: { name: 'Pink', border: 'border-pink-500 dark:border-pink-400', bg: 'bg-pink-100 dark:bg-pink-700/60', text: 'text-pink-700 dark:text-pink-100' }
+        };
+        const DEFAULT_COLUMNS_CONFIG = [
+            { title: 'To Do', themeColorName: 'red' },
+            { title: 'In Progress', themeColorName: 'yellow' },
+            { title: 'Done', themeColorName: 'green' }
+        ];
+
+        // --- UI Settings Functions ---
+        function loadUISettings() {
+            const storedSettings = localStorage.getItem('kanbanUISettings');
+            if (storedSettings) {
+                uiSettings = JSON.parse(storedSettings);
+            }
+            // Apply theme
+            applyTheme(uiSettings.theme || 'light');
+            // Apply minimized states
+            applyCollapsibleState('add-task-content-area', uiSettings.addTaskFormMinimized);
+            applyCollapsibleState('add-list-content-area', uiSettings.addListFormMinimized);
+        }
+
+        function saveUISettings() {
+            localStorage.setItem('kanbanUISettings', JSON.stringify(uiSettings));
+        }
+
+        function applyTheme(theme) {
+            document.documentElement.classList.toggle('dark', theme === 'dark');
+            themeToggleButton.textContent = theme === 'dark' ? 'Light Mode' : 'Dark Mode';
+            themeToggleButton.classList.toggle('light', theme === 'light');
+            themeToggleButton.classList.toggle('dark', theme === 'dark');
+            uiSettings.theme = theme; // Update state before saving if needed, or save directly
+            // No need to save here, will be saved by toggleTheme or on specific UI changes
+            renderBoard(); // Re-render to apply theme changes to columns
+        }
+
+        function toggleTheme() {
+            const newTheme = uiSettings.theme === 'light' ? 'dark' : 'light';
+            applyTheme(newTheme);
+            saveUISettings(); // Save after theme change
+        }
+
+        function applyCollapsibleState(contentId, isMinimized) {
+            const contentElement = document.getElementById(contentId);
+            const toggleButton = document.querySelector(`button[data-target="${contentId}"]`);
+            if (contentElement && toggleButton) {
+                contentElement.classList.toggle('minimized', isMinimized);
+                toggleButton.innerHTML = isMinimized ? SVG_ICON_PLUS : SVG_ICON_MINUS;
+                toggleButton.setAttribute('aria-expanded', !isMinimized);
+
+                if (contentId === 'add-task-content-area') {
+                    uiSettings.addTaskFormMinimized = isMinimized;
+                } else if (contentId === 'add-list-content-area') {
+                    uiSettings.addListFormMinimized = isMinimized;
+                }
+            }
+        }
+
+        function toggleCollapsibleSection(event) {
+            const button = event.currentTarget;
+            const targetId = button.dataset.target;
+            const contentElement = document.getElementById(targetId);
+            if (contentElement) {
+                const isNowMinimized = !contentElement.classList.contains('minimized');
+                applyCollapsibleState(targetId, isNowMinimized);
+                saveUISettings(); // Save UI settings after toggling
+            }
+        }
+
+
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadUISettings(); // Load UI settings first (includes theme and collapsible states)
+            populateColorThemeSelect();
+            loadStateFromLocalStorage(); // Loads tasks and columns, then calls renderBoard
+            resizeConfettiCanvas();
+
+            minimizeToggleButtons.forEach(button => {
+                button.addEventListener('click', toggleCollapsibleSection);
+                // Initial icon setup based on loaded state (already handled by applyCollapsibleState via loadUISettings)
+            });
+        });
+
+        function populateColorThemeSelect() {
+            Object.keys(COLUMN_THEMES).forEach(key => {
+                columnColorSelect.add(new Option(COLUMN_THEMES[key].name, key));
+            });
+            columnColorSelect.value = 'gray';
+        }
+
+        // --- Board Rendering ---
+        function renderBoard() {
+            kanbanColumnsContainer.innerHTML = '';
+            populateColumnSelects();
+            columnsData.forEach(column => {
+                kanbanColumnsContainer.appendChild(createColumnElement(column));
+            });
+        }
+
+        function populateColumnSelects() {
+            taskColumnSelect.innerHTML = '';
+            editTaskColumnSelect.innerHTML = '';
+            columnsData.forEach(col => {
+                taskColumnSelect.add(new Option(col.title, col.id));
+                editTaskColumnSelect.add(new Option(col.title, col.id));
+            });
+        }
+
+        // --- Column Functions ---
+        function createColumnElement(column) {
+            const columnDiv = document.createElement('div');
+            columnDiv.id = column.id;
+            columnDiv.classList.add('kanban-column');
+            columnDiv.draggable = true;
+
+            const columnHeaderDiv = document.createElement('div');
+            const themeConfig = COLUMN_THEMES[column.themeColorName] || COLUMN_THEMES.gray;
+            columnHeaderDiv.className = `column-header ${themeConfig.border} ${themeConfig.bg}`;
+
+            const columnTitleH2 = document.createElement('h2');
+            columnTitleH2.textContent = column.title;
+            columnTitleH2.className = `column-title ${themeConfig.text}`;
+
+            const deleteColBtn = document.createElement('button');
+            deleteColBtn.classList.add('delete-column-btn');
+            deleteColBtn.innerHTML = '&times;';
+            deleteColBtn.title = `Delete "${column.title}" list`;
+            deleteColBtn.onclick = (e) => {
+                e.stopPropagation();
+                if (confirm(`Are you sure you want to delete the "${column.title}" list and all its tasks?`)) {
+                    deleteColumn(column.id);
+                }
+            };
+            columnHeaderDiv.appendChild(columnTitleH2);
+            columnHeaderDiv.appendChild(deleteColBtn);
+
+            const tasksContainerDiv = document.createElement('div');
+            tasksContainerDiv.classList.add('tasks-container');
+            tasksContainerDiv.dataset.columnId = column.id;
+            tasks.filter(task => task.columnId === column.id).forEach(task => {
+                tasksContainerDiv.appendChild(createTaskElement(task));
+            });
+
+            columnDiv.appendChild(columnHeaderDiv);
+            columnDiv.appendChild(tasksContainerDiv);
+
+            columnDiv.addEventListener('dragstart', handleColumnDragStart);
+            columnDiv.addEventListener('dragend', handleColumnDragEnd);
+            columnDiv.addEventListener('dragover', handleColumnDragOver);
+            columnDiv.addEventListener('dragleave', handleColumnDragLeave);
+            columnDiv.addEventListener('drop', handleColumnDrop);
+            tasksContainerDiv.addEventListener('dragover', handleTaskDragOver);
+            tasksContainerDiv.addEventListener('dragleave', handleTaskDragLeave);
+            tasksContainerDiv.addEventListener('drop', handleTaskDrop);
+            return columnDiv;
+        }
+
+        function addColumn() {
+            const title = newColumnInput.value.trim();
+            const selectedThemeColorName = columnColorSelect.value;
+            if (!title) { alert("Column title cannot be empty."); return; }
+            columnsData.push({
+                id: `col-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                title: title, themeColorName: selectedThemeColorName
+            });
+            newColumnInput.value = '';
+            renderBoard(); saveStateToLocalStorage();
+        }
+
+        function deleteColumn(columnIdToDelete) {
+            tasks = tasks.filter(task => task.columnId !== columnIdToDelete);
+            columnsData = columnsData.filter(column => column.id !== columnIdToDelete);
+            renderBoard(); saveStateToLocalStorage();
+        }
+
+        // --- Task Functions ---
+        function createTaskElement(task) {
+            const taskDiv = document.createElement('div');
+            taskDiv.id = task.id;
+            taskDiv.classList.add('task');
+            taskDiv.draggable = true;
+
+            const titleEl = document.createElement('h4');
+            titleEl.classList.add('task-title');
+            titleEl.textContent = task.title;
+            taskDiv.appendChild(titleEl);
+
+            if (task.description) {
+                const descriptionEl = document.createElement('p');
+                descriptionEl.classList.add('task-description');
+                descriptionEl.textContent = task.description;
+                taskDiv.appendChild(descriptionEl);
+            }
+
+            if (task.imageUrl) {
+                const imageEl = document.createElement('img');
+                imageEl.src = task.imageUrl;
+                imageEl.alt = task.title;
+                imageEl.classList.add('task-image');
+                imageEl.onerror = function() { this.style.display = 'none'; };
+                taskDiv.appendChild(imageEl);
+            }
+
+            if (task.fileName) {
+                const fileInfoEl = document.createElement('div');
+                fileInfoEl.classList.add('task-file-info');
+                fileInfoEl.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                        <path d="M13 8V2H7v6H2l8 8 8-8h-5zM0 18h20v2H0v-2z"/>
+                    </svg>
+                    <span>${task.fileName} (${formatFileSize(task.fileSize)})</span>`;
+                taskDiv.appendChild(fileInfoEl);
+            }
+
+            taskDiv.addEventListener('dragstart', (event) => {
+                draggedColumnId = null; draggedTaskId = task.id;
+                event.dataTransfer.setData('text/plain', task.id);
+                event.target.classList.add('dragging');
+            });
+            taskDiv.addEventListener('dragend', (event) => {
+                draggedTaskId = null; event.target.classList.remove('dragging');
+            });
+            taskDiv.addEventListener('click', () => openEditModal(task));
+            return taskDiv;
+        }
+        
+        function formatFileSize(bytes, decimals = 2) {
+            if (!bytes || bytes === 0) return '0 Bytes'; // Added check for undefined or null bytes
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        function addTask() {
+            const taskTitle = newTaskTitleInput.value.trim();
+            const taskDescription = newTaskDescriptionInput.value.trim();
+            const taskImageUrl = newTaskImageUrlInput.value.trim();
+            const selectedFile = newTaskFileInput.files[0];
+            const selectedColumnId = taskColumnSelect.value;
+
+            if (taskTitle === '') { alert("Task Title cannot be empty!"); newTaskTitleInput.focus(); return; }
+            if (!selectedColumnId && columnsData.length > 0) { alert("Please select a column."); return; }
+            if (columnsData.length === 0) { alert("Please add a list/column first."); return; }
+
+            const newTaskData = {
+                id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                title: taskTitle, description: taskDescription, imageUrl: taskImageUrl,
+                columnId: selectedColumnId,
+                fileName: null, fileType: null, fileSize: null
+            };
+
+            if (selectedFile) {
+                newTaskData.fileName = selectedFile.name;
+                newTaskData.fileType = selectedFile.type;
+                newTaskData.fileSize = selectedFile.size;
+            }
+
+            tasks.push(newTaskData);
+            newTaskTitleInput.value = ''; newTaskDescriptionInput.value = ''; newTaskImageUrlInput.value = '';
+            newTaskFileInput.value = '';
+            renderBoard(); saveStateToLocalStorage();
+        }
+
+        function openEditModal(task) {
+            editTaskIdInput.value = task.id;
+            editTaskTitleInput.value = task.title;
+            editTaskDescriptionInput.value = task.description || '';
+            editTaskImageUrlInput.value = task.imageUrl || '';
+            editTaskColumnSelect.value = task.columnId;
+            
+            if (task.fileName) {
+                currentFileInfoSpan.textContent = `Current: ${task.fileName} (${formatFileSize(task.fileSize || 0)}). Select new file to replace.`;
+            } else {
+                currentFileInfoSpan.textContent = 'No file currently attached.';
+            }
+            editTaskFileInput.value = '';
+            editModal.style.display = 'block';
+        }
+        function closeEditModal() { editModal.style.display = 'none'; }
+
+        function saveEditedTask() {
+            const taskId = editTaskIdInput.value;
+            const newTitle = editTaskTitleInput.value.trim();
+            const newDescription = editTaskDescriptionInput.value.trim();
+            const newImageUrl = editTaskImageUrlInput.value.trim();
+            const newSelectedFile = editTaskFileInput.files[0];
+            const newColumnId = editTaskColumnSelect.value;
+
+            if (newTitle === '') { alert("Task Title cannot be empty!"); editTaskTitleInput.focus(); return; }
+
+            const taskIndex = tasks.findIndex(t => t.id === taskId);
+            if (taskIndex > -1) {
+                const oldColumnId = tasks[taskIndex].columnId;
+                tasks[taskIndex].title = newTitle;
+                tasks[taskIndex].description = newDescription;
+                tasks[taskIndex].imageUrl = newImageUrl;
+                tasks[taskIndex].columnId = newColumnId;
+
+                if (newSelectedFile) {
+                    tasks[taskIndex].fileName = newSelectedFile.name;
+                    tasks[taskIndex].fileType = newSelectedFile.type;
+                    tasks[taskIndex].fileSize = newSelectedFile.size;
+                }
+                renderBoard(); saveStateToLocalStorage(); closeEditModal();
+                const targetColumn = columnsData.find(col => col.id === newColumnId);
+                if (targetColumn && targetColumn.title.toLowerCase() === 'done' && oldColumnId !== newColumnId) {
+                    const oldCol = columnsData.find(c => c.id === oldColumnId);
+                     if (!oldCol || oldCol.title.toLowerCase() !== 'done') { triggerConfetti(); }
+                }
+            }
+        }
+
+        function deleteTask() {
+            const taskId = editTaskIdInput.value;
+            tasks = tasks.filter(t => t.id !== taskId);
+            renderBoard(); saveStateToLocalStorage(); closeEditModal();
+        }
+
+        // --- Drag and Drop Handlers ---
+        function handleTaskDragOver(event) { event.preventDefault(); if(draggedTaskId) this.classList.add('drag-over'); }
+        function handleTaskDragLeave(event) { this.classList.remove('drag-over'); }
+        function handleTaskDrop(event) {
+            event.preventDefault(); this.classList.remove('drag-over');
+            if (draggedColumnId) return; 
+            const targetColumnId = this.dataset.columnId;
+            const task = tasks.find(t => t.id === draggedTaskId);
+            if (task && task.columnId !== targetColumnId) {
+                const oldColumnId = task.columnId;
+                task.columnId = targetColumnId;
+                renderBoard(); saveStateToLocalStorage();
+                const targetColumn = columnsData.find(col => col.id === targetColumnId);
+                const oldCol = columnsData.find(c => c.id === oldColumnId);
+                if (targetColumn && targetColumn.title.toLowerCase() === 'done') {
+                    if (!oldCol || oldCol.title.toLowerCase() !== 'done') { triggerConfetti(); }
+                }
+            }
+        }
+        function handleColumnDragStart(event) {
+            if (event.target.classList.contains('delete-column-btn') || event.target.closest('.delete-column-btn')) {
+                event.preventDefault(); return;
+            }
+            draggedTaskId = null; draggedColumnId = this.id;
+            event.dataTransfer.setData('text/plain', this.id);
+            event.dataTransfer.effectAllowed = 'move';
+            setTimeout(() => { if(document.getElementById(this.id)) document.getElementById(this.id).style.opacity = '0.6'; }, 0);
+        }
+        function handleColumnDragEnd(event) {
+            if (draggedColumnId) {
+                const draggedEl = document.getElementById(draggedColumnId);
+                if (draggedEl) draggedEl.style.opacity = '1';
+            }
+            document.querySelectorAll('.kanban-column.column-drag-over').forEach(col => col.classList.remove('column-drag-over'));
+            draggedColumnId = null;
+        }
+        function handleColumnDragOver(event) {
+            event.preventDefault(); if (draggedTaskId) return; 
+            event.dataTransfer.dropEffect = 'move';
+            if (this.id !== draggedColumnId) { this.classList.add('column-drag-over');}
+        }
+        function handleColumnDragLeave(event) {
+            if (this.id !== draggedColumnId) { this.classList.remove('column-drag-over'); }
+        }
+        function handleColumnDrop(event) {
+            event.preventDefault(); event.stopPropagation(); 
+            this.classList.remove('column-drag-over');
+            if (draggedTaskId) return; 
+            if (!draggedColumnId || this.id === draggedColumnId) return;
+            const targetColumnId = this.id;
+            const draggedIndex = columnsData.findIndex(col => col.id === draggedColumnId);
+            const targetIndex = columnsData.findIndex(col => col.id === targetColumnId);
+            if (draggedIndex !== -1 && targetIndex !== -1) {
+                const [draggedItem] = columnsData.splice(draggedIndex, 1);
+                columnsData.splice(targetIndex, 0, draggedItem);
+                renderBoard(); saveStateToLocalStorage();
+            }
+        }
+
+        // --- Local Storage ---
+        function saveStateToLocalStorage() { // Saves tasks and columns
+            localStorage.setItem('kanbanTaskData', JSON.stringify({ tasks, columnsData }));
+        }
+        function loadStateFromLocalStorage() { // Loads tasks and columns
+            const storedTaskData = localStorage.getItem('kanbanTaskData');
+            if (storedTaskData) {
+                const appState = JSON.parse(storedTaskData);
+                tasks = appState.tasks || [];
+                columnsData = appState.columnsData || [];
+                if (columnsData.length === 0 && DEFAULT_COLUMNS_CONFIG.length > 0) {
+                    columnsData = DEFAULT_COLUMNS_CONFIG.map(colConfig => ({
+                        id: `col-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                        title: colConfig.title, themeColorName: colConfig.themeColorName
+                    }));
+                }
+            } else { // Default state if nothing in local storage
+                columnsData = DEFAULT_COLUMNS_CONFIG.map(colConfig => ({
+                    id: `col-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    title: colConfig.title, themeColorName: colConfig.themeColorName
+                }));
+                tasks = [
+                     { id: `task-${Date.now()}-1`, title: 'Welcome!', description: 'Try minimizing the forms above.', imageUrl: '', fileName: null, fileType: null, fileSize: null, columnId: columnsData[0].id },
+                     { id: `task-${Date.now()}-2`, title: 'My Report', description: 'Final review needed.', imageUrl: '', fileName: 'report_final.docx', fileType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', fileSize: 123456, columnId: columnsData[0].id },
+                     { id: `task-${Date.now()}-3`, title: 'Inspiration Pic', description: 'For the new logo.', imageUrl: 'https://placehold.co/600x400/7c3aed/ffffff?text=Logo+Idea', fileName: null, fileType: null, fileSize: null, columnId: columnsData[1].id }
+                ];
+            }
+            renderBoard(); // Render board after loading tasks and columns
+        }
+
+        // --- Confetti Animation (Unchanged) ---
+        const confettiCanvas = document.getElementById('confetti-canvas');
+        const confettiCtx = confettiCanvas.getContext('2d');
+        let confettiPieces = [];
+        const confettiColors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4CAF50', '#8BC34A', '#CDDC39', '#FFEB3B', '#FFC107', '#FF9800', '#FF5722'];
+        function resizeConfettiCanvas() { confettiCanvas.width = window.innerWidth; confettiCanvas.height = window.innerHeight; }
+        function ConfettiPiece(x, y) { this.x = x; this.y = y; this.size = Math.random() * 8 + 4; this.vx = Math.random() * 6 - 3; this.vy = Math.random() * -15 - 5; this.gravity = 0.5; this.opacity = 1; this.color = confettiColors[Math.floor(Math.random() * confettiColors.length)]; this.angle = Math.random() * Math.PI * 2; this.angularSpin = Math.random() * 0.1 - 0.05;}
+        ConfettiPiece.prototype.update = function() { this.vy += this.gravity; this.x += this.vx; this.y += this.vy; this.opacity -= 0.01; this.angle += this.angularSpin; };
+        ConfettiPiece.prototype.draw = function() { confettiCtx.save(); confettiCtx.translate(this.x + this.size / 2, this.y + this.size / 2); confettiCtx.rotate(this.angle); confettiCtx.fillStyle = this.color; confettiCtx.globalAlpha = this.opacity; confettiCtx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size); confettiCtx.restore(); };
+        let confettiAnimationId;
+        function triggerConfetti() {
+            confettiPieces = []; const centerX = confettiCanvas.width / 2; const centerY = confettiCanvas.height / 3;
+            for (let i = 0; i < 150; i++) { confettiPieces.push(new ConfettiPiece(centerX, centerY));}
+            if (confettiPieces.length > 0 && !confettiAnimationId) animateConfetti();
+        }
+        function animateConfetti() {
+            confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height); let activePieces = false;
+            confettiPieces.forEach((piece, index) => {
+                piece.update(); piece.draw();
+                if (piece.opacity > 0 && piece.y < confettiCanvas.height) { activePieces = true; } else { confettiPieces.splice(index, 1); }
+            });
+            if (activePieces) { confettiAnimationId = requestAnimationFrame(animateConfetti); }
+            else { cancelAnimationFrame(confettiAnimationId); confettiAnimationId = null; confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height); }
+        }
+
+        // --- Event Listeners ---
+        themeToggleButton.addEventListener('click', toggleTheme);
+        addTaskButton.addEventListener('click', addTask);
+        newTaskTitleInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') addTaskButton.click(); });
+        newTaskDescriptionInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addTaskButton.click();} });
+        newTaskImageUrlInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') addTaskButton.click(); });
+
+        addColumnButton.addEventListener('click', addColumn);
+        newColumnInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') addColumnButton.click(); });
+        closeModalButton.addEventListener('click', closeEditModal);
+        saveTaskButton.addEventListener('click', saveEditedTask);
+        deleteTaskButton.addEventListener('click', deleteTask);
+        window.addEventListener('click', (event) => { if (event.target == editModal) closeEditModal(); });
+        window.addEventListener('resize', resizeConfettiCanvas);
+    </script>
+</body>
+</html>
